@@ -1,0 +1,6 @@
+{
+    "files.watcherExclude": {
+        "**/data/**": true,
+        "**/shared/database/migrations/versions/**": true
+    }
+}

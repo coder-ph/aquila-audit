@@ -1,0 +1,59 @@
+
+
+services:
+  api-gateway:
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../services:/app/services
+      - ../shared:/app/shared
+
+  worker-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_worker
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - CELERY_BROKER_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: celery -A services.worker_service.celery_app worker --loglevel=info
+
+  ingestion-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_ingestion
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: python services.ingestion_service.main
