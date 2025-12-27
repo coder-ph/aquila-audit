@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import Header, HTTPException, status
 from uuid import UUID
+from fastapi import Depends
 
 from shared.utils.logging import logger
 

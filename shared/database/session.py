@@ -49,3 +49,11 @@ class DatabaseSessionManager:
     def get_session(self) -> Session:
         """Get a new database session."""
         return self.session_factory()
+    
+def get_db_session() -> Generator[Session, None, None]:
+    """FastAPI dependency for database sessions."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

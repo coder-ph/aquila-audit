@@ -11,13 +11,17 @@ isort==5.12.0
 flake8==6.1.0
 mypy==1.7.0
 pre-commit==3.5.0
+pyotp==2.9.0
 
 # Development Tools
 ipython==8.17.2
 ipdb==0.13.13
 watchdog==3.0.0
+qrcode==7.4.2
+pillow==10.1.0
 
 # Documentation
 mkdocs==1.5.3
 mkdocs-material==9.5.3
 mkdocstrings[python]==0.23.0
+pydantic_settings==2.1.0

@@ -4,6 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
+
 import time
 
 from services.api_gateway.config import config
@@ -12,7 +13,12 @@ from shared.database.base import init_db
 from shared.messaging.rabbitmq_client import rabbitmq_client
 
 # Import routers
-from services.api_gateway.routes import auth, upload, reports
+# from services.api_gateway.routes import auth, upload, reports
+
+# Import the routers directly from the submodules
+from services.api_gateway.routes.auth import router as auth_router
+# from services.api_gateway.routes.upload import router as upload_router
+# from services.api_gateway.routes.reports import router as reports_router
 
 
 @asynccontextmanager
@@ -148,22 +154,22 @@ async def health_check():
 
 # Include routers
 app.include_router(
-    auth.router,
+    auth_router,
     prefix=f"{config.api_prefix}/auth",
     tags=["Authentication"]
 )
 
-app.include_router(
-    upload.router,
-    prefix=f"{config.api_prefix}/upload",
-    tags=["File Upload"]
-)
+# app.include_router(
+#     upload_router,
+#     prefix=f"{config.api_prefix}/upload",
+#     tags=["File Upload"]
+# )
 
-app.include_router(
-    reports.router,
-    prefix=f"{config.api_prefix}/reports",
-    tags=["Reports"]
-)
+# app.include_router(
+#     reports_router,
+#     prefix=f"{config.api_prefix}/reports",
+#     tags=["Reports"]
+# )
 
 
 # Root endpoint

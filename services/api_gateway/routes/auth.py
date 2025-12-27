@@ -1,10 +1,11 @@
+from datetime import timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from shared.database.session import get_session
+from shared.database.session import get_db_session, get_session
 from shared.auth.jwt_handler import jwt_handler
 from shared.auth.password import PasswordManager, generate_secure_password
 from shared.auth.mfa import mfa_manager
@@ -26,7 +27,7 @@ async def register_user(
     password: str = Body(..., description="User password"),
     full_name: str = Body(..., description="Full name"),
     company: Optional[str] = Body(None, description="Company name"),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db_session)
 ):
     """
     Register a new user.
@@ -82,7 +83,7 @@ async def register_user(
 @router.post("/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db_session)
 ):
     """
     Login user and return tokens.
@@ -181,7 +182,7 @@ async def change_password(
     current_password: str = Body(...),
     new_password: str = Body(...),
     user_info: tuple = Depends(get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db_session)
 ):
     """
     Change user password.
@@ -223,7 +224,7 @@ async def change_password(
 @router.post("/reset-password-request")
 async def reset_password_request(
     email: str = Body(...),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db_session)
 ):
     """
     Request password reset.
@@ -304,7 +305,7 @@ async def reset_password(
 @router.get("/me")
 async def get_current_user_info(
     user_info: tuple = Depends(get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db_session)
 ):
     """
     Get current user information.

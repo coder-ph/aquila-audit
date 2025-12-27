@@ -61,9 +61,11 @@ class Settings(BaseSettings):
             return [ext.strip() for ext in v.split(",")]
         return v
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"  # This is the crucial line
+    }
 
 
 @lru_cache
