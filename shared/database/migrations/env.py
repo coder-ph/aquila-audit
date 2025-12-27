@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from shared.database.base import Base
-from shared.models.base import BaseModel
+from shared.models.base import BaseModel, TenantBaseModel
 from shared.utils.config import Settings
-
+from shared.models.user_models import User, Tenant, UserRole, UserTenant, AuditLog
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
