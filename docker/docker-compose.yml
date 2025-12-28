@@ -110,7 +110,7 @@ services:
         condition: service_healthy
     networks:
       - aquila_network
-    command: python -m services.admin_service.main
+    command: uvicorn services.admin_service.main:app --host 0.0.0.0 --port 8000
 
   worker-service:
     build:

@@ -21,6 +21,11 @@ passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 python-multipart==0.0.6
 
+pandas
+uvicorn
+fastapi
+celery
+
 # Redis
 redis==5.0.1
 

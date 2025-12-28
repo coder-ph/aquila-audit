@@ -57,7 +57,7 @@ db-downgrade:
 
 health:
 	@echo "Checking service health..."
-	python scripts/health_check.py
+	python3 scripts/health_check.py
 
 down:
 	@echo "Stopping all services..."
