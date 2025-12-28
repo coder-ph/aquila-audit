@@ -8,10 +8,10 @@ services:
       POSTGRES_DB: aquila_audit
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aquila -d aquila_audit"]
-      interval: 1m30s
-      timeout: 30s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
     ports:
       - "5432:5432"
     volumes:
@@ -19,7 +19,6 @@ services:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - aquila_network
-    
 
   redis:
     image: redis:7-alpine
@@ -52,13 +51,13 @@ services:
       - aquila_network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 5
 
   api-gateway:
     build:
-      context: ${PWD}
+      context: ..
       dockerfile: docker/Dockerfile
     container_name: aquila_api_gateway
     ports:
@@ -66,16 +65,14 @@ services:
     env_file:
       - ../.env
     environment:
-
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
       - REDIS_URL=redis://redis:6379/0
       - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
       - SECRET_KEY=${SECRET_KEY}
       - ENVIRONMENT=development
-      
     volumes:
-      - ..:/app  # This mounts your entire project root to /app inside the container
+      - ..:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +83,83 @@ services:
     networks:
       - aquila_network
     command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
+
+  admin-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_admin_service
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - SECRET_KEY=${SECRET_KEY}
+      - ADMIN_TOKEN=admin-secret-token-change-in-production
+      - ENVIRONMENT=development
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: python -m services.admin_service.main
+
+  worker-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_worker_service
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - CELERY_BROKER_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: celery -A services.worker_service.celery_app worker --loglevel=info --concurrency=4
+
+  ingestion-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_ingestion_service
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - ENVIRONMENT=development
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: python -m services.ingestion_service.main
 
 volumes:
   postgres_data:

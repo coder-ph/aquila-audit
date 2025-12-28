@@ -15,16 +15,23 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install development dependencies if in dev mode
-COPY requirements-dev.txt .
+# Added a check to ensure the file exists before COPY to prevent build failure
+COPY requirements-dev.txt* . 
 RUN if [ -f requirements-dev.txt ]; then pip install --no-cache-dir -r requirements-dev.txt; fi
 
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 aquila && chown -R aquila:aquila /app
+# Ensure the app directory is in the python path
+ENV PYTHONPATH=/app
+
+# Create non-root user and set permissions
+RUN useradd -m -u 1000 aquila && \
+    chown -R aquila:aquila /app
 USER aquila
 
 EXPOSE 8000
 
+# This default CMD acts as a fallback for the API Gateway, 
+# but will be overridden by the 'command' in docker-compose for other services.
 CMD ["uvicorn", "services.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

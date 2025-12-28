@@ -1,4 +1,4 @@
-.PHONY: help setup dev test lint format clean db-migrate db-upgrade db-downgrade
+.PHONY: help setup dev test lint format clean db-migrate db-upgrade db-downgrade health down logs
 
 help:
 	@echo "Available commands:"
@@ -11,6 +11,9 @@ help:
 	@echo "  make db-migrate - Create new migration"
 	@echo "  make db-upgrade - Upgrade database to latest"
 	@echo "  make db-downgrade - Downgrade database by one version"
+	@echo "  make health     - Check service health"
+	@echo "  make down       - Stop all services"
+	@echo "  make logs       - View service logs"
 
 setup:
 	@echo "Setting up development environment..."
@@ -20,7 +23,8 @@ setup:
 	@echo "Please update .env with your configuration"
 
 dev:
-	docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml up --build
+	@echo "Starting development services..."
+	./scripts/start_services.sh
 
 test:
 	pytest tests/ -v --cov=services --cov=shared --cov-report=term-missing
@@ -50,3 +54,15 @@ db-upgrade:
 
 db-downgrade:
 	cd shared/database && alembic downgrade -1
+
+health:
+	@echo "Checking service health..."
+	python scripts/health_check.py
+
+down:
+	@echo "Stopping all services..."
+	docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml down
+
+logs:
+	@echo "Showing service logs..."
+	docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml logs -f
