@@ -1,12 +1,22 @@
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 
-from shared.models.base import BaseModel, TenantBaseModel
-from shared.database.base import Base
+from shared.models.base import BaseModel, TenantBaseModel, Base
+
+
+# Association table for User-Tenant many-to-many relationship
+user_tenants = Table(
+    'user_tenants',
+    Base.metadata,
+    Column('user_id', UUID(as_uuid=True), ForeignKey('users.id'), primary_key=True),
+    Column('tenant_id', UUID(as_uuid=True), ForeignKey('tenants.id'), primary_key=True),
+    Column('role', String(50), default='member', nullable=False),
+    Column('joined_at', DateTime, default=datetime.utcnow, nullable=False)
+)
 
 
 class User(BaseModel):
@@ -35,7 +45,7 @@ class User(BaseModel):
     password_changed_at = Column(DateTime, nullable=True)
     
     # Relationships
-    tenants = relationship("Tenant", secondary="user_tenants", back_populates="users")
+    tenants = relationship("Tenant", secondary=user_tenants, back_populates="users")
     roles = relationship("UserRole", back_populates="user")
     
     def __repr__(self):
@@ -82,7 +92,7 @@ class Tenant(BaseModel):
     monthly_allowance = Column(Text, nullable=True)  # JSON allowance config
     
     # Relationships
-    users = relationship("User", secondary="user_tenants", back_populates="tenants")
+    users = relationship("User", secondary=user_tenants, back_populates="tenants")
     files = relationship("File", back_populates="tenant")
     rules = relationship("Rule", back_populates="tenant")
     findings = relationship("Finding", back_populates="tenant")
@@ -95,25 +105,6 @@ class Tenant(BaseModel):
     def user_count(self) -> int:
         """Get number of users in tenant."""
         return len(self.users) if self.users else 0
-
-
-class UserTenant(Base):
-    """User-Tenant association model."""
-    
-    __tablename__ = "user_tenants"
-    
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True)
-    
-    # Role in this tenant
-    role = Column(String(50), default="member", nullable=False)
-    
-    # Timestamps
-    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
-    # Relationships
-    user = relationship("User", backref="tenant_associations")
-    tenant = relationship("Tenant", backref="user_associations")
 
 
 class UserRole(TenantBaseModel):

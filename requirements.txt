@@ -40,3 +40,5 @@ tzlocal==5.2
 
 # Logging
 structlog==23.2.0
+
+pydantic[email]

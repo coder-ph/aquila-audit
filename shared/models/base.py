@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, DateTime, String, event
+from sqlalchemy import Column, DateTime, String, event , ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declared_attr
 
@@ -53,12 +53,7 @@ class TenantBaseModel(BaseModel):
     
     __abstract__ = True
     
-    tenant_id = Column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-        comment="Tenant identifier for data isolation"
-    )
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
     
     @classmethod
     def query_with_tenant(cls, session, tenant_id: uuid.UUID):
