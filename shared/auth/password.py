@@ -79,6 +79,17 @@ class PasswordManager:
         return get_password_hash(password)
     
     @staticmethod
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        """
+        Verify a password against its hash.
+        """
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception as e:
+            logger.error("Password verification failed", error=str(e))
+            return False
+    
+    @staticmethod
     def get_password_hash(password: str) -> str:
         """Get password hash."""
         return get_password_hash(password)
