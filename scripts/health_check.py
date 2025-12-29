@@ -7,9 +7,11 @@ import time
 import sys
 from typing import Dict, List, Tuple
 
+# Updated to include Rule Engine and correct ports
 HEALTH_ENDPOINTS = [
     ("API Gateway", "http://localhost:8000/health"),
     ("Admin Service", "http://localhost:8001/health"),
+    ("Rule Engine", "http://localhost:8002/health"),
 ]
 
 SERVICE_PORTS = [
@@ -60,7 +62,7 @@ def main():
     for service_name, port in SERVICE_PORTS:
         is_healthy = check_port("localhost", port)
         status = "✅ Running" if is_healthy else "❌ Not running"
-        print(f"  {service_name}: {status}")
+        print(f"   {service_name}: {status}")
         if not is_healthy:
             all_healthy = False
     
@@ -68,7 +70,7 @@ def main():
     print("\n🌐 HTTP Services:")
     for service_name, url in HEALTH_ENDPOINTS:
         is_healthy, message = check_http_endpoint(service_name, url)
-        print(f"  {service_name}: {message}")
+        print(f"   {service_name}: {message}")
         if not is_healthy:
             all_healthy = False
     
@@ -77,12 +79,12 @@ def main():
     try:
         response = requests.get("http://localhost:15672", timeout=5)
         if response.status_code == 200:
-            print("  Management UI: ✅ Accessible")
+            print("   Management UI: ✅ Accessible")
         else:
-            print(f"  Management UI: ❌ HTTP {response.status_code}")
+            print(f"   Management UI: ❌ HTTP {response.status_code}")
             all_healthy = False
     except Exception as e:
-        print(f"  Management UI: ❌ {str(e)}")
+        print(f"   Management UI: ❌ {str(e)}")
         all_healthy = False
     
     print("\n" + "=" * 50)

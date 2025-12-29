@@ -3,6 +3,7 @@ services:
     image: postgres:15-alpine
     container_name: aquila_postgres
     environment:
+    
       POSTGRES_USER: ${POSTGRES_USER:-aquila}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aquila123}
       POSTGRES_DB: aquila_audit
@@ -110,7 +111,34 @@ services:
         condition: service_healthy
     networks:
       - aquila_network
-    command: uvicorn services.admin_service.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn services.admin_service.main:app --host 0.0.0.0 --port 8001
+
+  rule-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_rule_engine
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: uvicorn services.rule_engine.main:app --host 0.0.0.0 --port 8002
 
   worker-service:
     build:
