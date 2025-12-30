@@ -1,9 +1,10 @@
+
+
 services:
   postgres:
     image: postgres:15-alpine
     container_name: aquila_postgres
     environment:
-    
       POSTGRES_USER: ${POSTGRES_USER:-aquila}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aquila123}
       POSTGRES_DB: aquila_audit
@@ -85,34 +86,33 @@ services:
       - aquila_network
     command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Add ml-service
-ml-service:
-  build:
-    context: ..
-    dockerfile: docker/Dockerfile
-  container_name: aquila_ml_service
-  ports:
-    - "8003:8003"
-  environment:
-    - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
-    - REDIS_URL=redis://redis:6379/0
-    - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
-    - SECRET_KEY=${SECRET_KEY}
-    - ENVIRONMENT=development
-  volumes:
-    - ../data:/app/data
-    - ../shared:/app/shared
-    - ../services/ml_service:/app/services/ml_service
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
-    rabbitmq:
-      condition: service_healthy
-  networks:
-    - aquila_network
-  command: uvicorn services.ml_service.main:app --host 0.0.0.0 --port 8003
+  ml-service:  # <--- This was the error. Now correctly indented.
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_ml_service
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/ml_service:/app/services/ml_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: uvicorn services.ml_service.main:app --host 0.0.0.0 --port 8003
 
   admin-service:
     build:

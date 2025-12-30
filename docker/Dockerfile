@@ -23,10 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Install development dependencies if they exist
 # The wildcard * prevents the COPY from failing if the file is missing
-COPY requirements-dev.txt* .
-RUN if [ -f requirements-dev.txt ]; then \
-        pip install --no-cache-dir -r requirements-dev.txt; \
-    fi
+# COPY requirements-dev.txt* .
+# RUN if [ -f requirements-dev.txt ]; then \
+#         pip install --no-cache-dir -r requirements-dev.txt; \
+#     fi
 
 # Copy application code
 COPY . .
