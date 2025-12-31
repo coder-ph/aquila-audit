@@ -55,7 +55,6 @@ services:
         condition: service_healthy
     networks:
       - aquila_network
-    # Added -m to fix the "No module named" error seen in logs
     command: python -m services.ingestion_service.main
 
   llm-service:
@@ -86,3 +85,29 @@ services:
     networks:
       - aquila_network
     command: python -m services.llm_service.main
+
+  reporting-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_reporting
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/reporting_service:/app/services/reporting_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: python -m services.reporting_service.main

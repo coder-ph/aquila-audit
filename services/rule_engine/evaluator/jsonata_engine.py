@@ -129,7 +129,7 @@ class JSONataEngine:
             "$strLength": string_length
         }
     
-    def compile_expression(self, expression: str) -> jsonata.Expression:
+    def compile_expression(self, expression: str) -> "jsonata.Expression":
         """
         Compile JSONata expression with custom functions.
         

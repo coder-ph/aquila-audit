@@ -1,16 +1,14 @@
-from typing import Optional, Tuple
-from fastapi import Request, HTTPException, status
+from typing import Optional, Tuple, Any, Dict
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
 from uuid import UUID
+import json
 
-from shared.database.session import get_session
 from shared.auth.jwt_handler import jwt_handler
 from shared.utils.logging import logger
 
-
 class TenantHTTPBearer(HTTPBearer):
-    """Custom HTTPBearer with tenant support."""
+    """Custom HTTPBearer that extracts user and tenant info from JWT."""
     
     def __init__(self, auto_error: bool = True):
         super().__init__(auto_error=auto_error)
@@ -19,39 +17,34 @@ class TenantHTTPBearer(HTTPBearer):
         credentials = await super().__call__(request)
         
         if credentials:
-            # Verify token
             payload = jwt_handler.verify_token(credentials.credentials)
             if not payload:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authentication credentials",
+                    detail="Invalid or expired authentication credentials",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
-            # Add user info to request state
-            request.state.user_id = UUID(payload.get("sub"))
-            request.state.tenant_id = UUID(payload.get("tenant_id")) if payload.get("tenant_id") else None
-            request.state.scope = payload.get("scope", "user")
+            # Populate request state for downstream dependencies
+            try:
+                request.state.user_id = UUID(payload.get("sub"))
+                # tenant_id can be None for platform admins
+                tid = payload.get("tenant_id")
+                request.state.tenant_id = UUID(tid) if tid else None
+                request.state.scope = payload.get("scope", "user")
+                request.state.email = payload.get("email", "unknown@aquila.com")
+                request.state.username = payload.get("username", "user")
+            except Exception as e:
+                logger.error(f"Error parsing JWT payload into state: {str(e)}")
+                raise HTTPException(status_code=401, detail="Malformed token payload")
         
         return credentials
 
-
-def get_current_user(
-    request: Request,
-    required_scope: Optional[str] = None
-) -> Tuple[UUID, Optional[UUID]]:
+# 1. Dependency to get the User object (as expected by your routes)
+def get_current_user(request: Request) -> Any:
     """
-    Get current user from request.
-    
-    Args:
-        request: FastAPI request
-        required_scope: Required scope for authorization
-    
-    Returns:
-        Tuple of (user_id, tenant_id)
-    
-    Raises:
-        HTTPException: If user not authenticated or scope insufficient
+    Returns an object compatible with the User schema.
+    If you have a DB model, you would query it here using request.state.user_id.
     """
     if not hasattr(request.state, 'user_id'):
         raise HTTPException(
@@ -59,44 +52,56 @@ def get_current_user(
             detail="Not authenticated"
         )
     
-    # Check scope if required
-    if required_scope and hasattr(request.state, 'scope'):
-        if request.state.scope != required_scope:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required scope: {required_scope}"
-            )
+    # We create a simple Namespace or Class to mimic the User model
+    # so that 'current_user.email' works in your routes.
+    class UserContext:
+        def __init__(self, uid, email, username, scope):
+            self.id = uid
+            self.email = email
+            self.username = username
+            self.is_admin = (scope == "admin")
+            self.scope = scope
+
+    return UserContext(
+        uid=request.state.user_id,
+        email=getattr(request.state, 'email', None),
+        username=getattr(request.state, 'username', None),
+        scope=getattr(request.state, 'scope', 'user')
+    )
+
+# 2. Dependency to verify and return tenant_id (as expected by your routes)
+async def verify_tenant_access(request: Request) -> str:
+    """
+    Ensures a tenant context exists and returns the ID as a string.
+    """
+    if not hasattr(request.state, 'tenant_id') or request.state.tenant_id is None:
+        # Check headers if state is empty (fallback for non-JWT flows)
+        tenant_header = request.headers.get("X-Tenant-ID")
+        if tenant_header:
+            try:
+                return str(UUID(tenant_header))
+            except ValueError:
+                pass
+        
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant context is required for this operation"
+        )
     
-    return request.state.user_id, request.state.tenant_id
+    return str(request.state.tenant_id)
 
-
+# 3. Helper for generic tenant requirement (returns UUID)
 def tenant_required(request: Request) -> UUID:
-    """
-    Ensure tenant context is present.
-    
-    Args:
-        request: FastAPI request
-    
-    Returns:
-        Tenant ID
-    
-    Raises:
-        HTTPException: If tenant not in context
-    """
-    user_id, tenant_id = get_current_user(request)
-    
-    if not tenant_id:
+    """Ensures tenant context is present and returns it as a UUID."""
+    if not hasattr(request.state, 'tenant_id') or not request.state.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Tenant context required"
         )
-    
-    return tenant_id
-
+    return request.state.tenant_id
 
 class TenantMiddleware:
-    """Middleware for tenant isolation."""
-    
+    """ASGI Middleware for manual tenant extraction from headers/params."""
     def __init__(self, app):
         self.app = app
     
@@ -106,25 +111,15 @@ class TenantMiddleware:
             return
         
         request = Request(scope, receive)
-        
-        # Extract tenant from headers or query params for non-auth routes
         if not hasattr(request.state, 'tenant_id'):
-            tenant_header = request.headers.get("X-Tenant-ID")
-            tenant_query = request.query_params.get("tenant_id")
-            
-            if tenant_header:
+            t_id = request.headers.get("X-Tenant-ID") or request.query_params.get("tenant_id")
+            if t_id:
                 try:
-                    request.state.tenant_id = UUID(tenant_header)
-                except ValueError:
-                    pass
-            elif tenant_query:
-                try:
-                    request.state.tenant_id = UUID(tenant_query)
-                except ValueError:
+                    request.state.tenant_id = UUID(t_id)
+                except (ValueError, TypeError):
                     pass
         
         await self.app(scope, receive, send)
 
-
-# Security scheme for OpenAPI
+# Security scheme for FastAPI docs
 security_scheme = TenantHTTPBearer()

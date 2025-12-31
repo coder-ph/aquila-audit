@@ -62,11 +62,11 @@ done
 
 # 3. Start the API Gateway first so we can use it to run migrations/seeds
 echo -e "${YELLOW}Starting API Gateway for migrations...${NC}"
-docker-compose -f $COMPOSE_FILE up -d api-gateway admin-service rule-engine ml-service worker-service
+docker-compose -f $COMPOSE_FILE up -d api-gateway admin-service rule-engine ml-service worker-service llm-service
 
-# echo -e "${YELLOW}Building and starting all services...${NC}"
-# docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml up -d --build \
-#   api-gateway admin-service rule-engine ml-service worker-service
+echo -e "${YELLOW}Building and starting all services...${NC}"
+docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml up -d --build \
+  api-gateway admin-service rule-engine ml-service worker-service llm-service ingestion-service
 
 # 4. Run database migrations inside the container
 echo -e "${YELLOW}Running database migrations...${NC}"
