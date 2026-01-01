@@ -28,6 +28,8 @@ async def generate_report(
     report_data: Dict[str, Any],
     background_tasks: BackgroundTasks,
     format: str = Query("pdf", regex="^(pdf|excel|html)$"),
+    async_mode: bool = Query(True, description="Generate report asynchronously"),
+    include_explanations: bool = Query(True, description="Include AI explanations"),
     tenant_id: str = Depends(verify_tenant_access),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
@@ -37,6 +39,8 @@ async def generate_report(
     Args:
         report_data: Report data including findings, metrics, etc.
         format: Output format (pdf, excel, html)
+        async_mode: Whether to generate asynchronously
+        include_explanations: Whether to include AI explanations
         tenant_id: Tenant ID for isolation
         current_user: Current authenticated user
     
@@ -44,6 +48,12 @@ async def generate_report(
         Report generation metadata
     """
     try:
+        import uuid
+        from datetime import datetime
+        
+        # Generate report ID
+        report_id = str(uuid.uuid4())
+        
         # Add user and tenant info to report data
         if 'generated_by' not in report_data:
             report_data['generated_by'] = current_user.email or current_user.username
@@ -57,27 +67,156 @@ async def generate_report(
         if 'generated_date' not in report_data:
             report_data['generated_date'] = datetime.now().isoformat()
         
-        # Generate report
-        result = report_generator.generate_report(
-            report_data=report_data,
-            output_format=format,
-            tenant_id=tenant_id
-        )
+        # Extract findings IDs if provided
+        findings_ids = report_data.get('findings_ids', [])
         
-        # Schedule cleanup if enabled
-        if config.auto_cleanup_enabled:
-            background_tasks.add_task(
-                report_generator.cleanup_old_reports,
+        if async_mode:
+            # Event-driven async generation
+            from services.reporting_service.events.report_publisher import report_publisher
+            
+            # Publish report generation request
+            success = report_publisher.publish_report_requested(
+                tenant_id=tenant_id,
+                report_id=report_id,
+                report_type=format,
+                findings_ids=findings_ids,
+                user_id=str(current_user.id),
+                include_explanations=include_explanations
+            )
+            
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to queue report generation"
+                )
+            
+            # Create initial report record in database
+            from shared.database.session import get_db
+            from shared.models.report_models import Report
+            import uuid as uuid_lib
+            
+            db = next(get_db())
+            report = Report(
+                id=uuid_lib.UUID(report_id),
+                tenant_id=uuid_lib.UUID(tenant_id),
+                user_id=current_user.id,
+                report_type=format,
+                status='queued',
+                parameters=report_data
+            )
+            db.add(report)
+            db.commit()
+            
+            return {
+                'message': 'Report generation queued',
+                'report_id': report_id,
+                'status': 'queued',
+                'async': True,
+                'queue_position': 'report_generation_request',
+                'estimated_completion': 'Check status via report status endpoint'
+            }
+        
+        else:
+            # Synchronous generation (for small reports)
+            result = report_generator.generate_report(
+                report_data=report_data,
+                output_format=format,
                 tenant_id=tenant_id
             )
-        
-        return result
+            
+            # Schedule cleanup if enabled
+            if config.auto_cleanup_enabled:
+                background_tasks.add_task(
+                    report_generator.cleanup_old_reports,
+                    tenant_id=tenant_id
+                )
+            
+            return {
+                'message': 'Report generated synchronously',
+                'report_id': report_id,
+                'status': 'completed',
+                'async': False,
+                'result': result
+            }
         
     except Exception as e:
         logger.error(f"Error generating report: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate report: {str(e)}"
+        )
+
+
+# Add new endpoint for checking report status
+@router.get("/status/{report_id}")
+async def get_report_status(
+    report_id: str,
+    tenant_id: str = Depends(verify_tenant_access),
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get report generation status.
+    
+    Args:
+        report_id: Report ID
+        tenant_id: Tenant ID
+        current_user: Current user
+    
+    Returns:
+        Report status information
+    """
+    try:
+        from shared.database.session import get_db
+        from shared.models.report_models import Report
+        import uuid
+        
+        db = next(get_db())
+        
+        report = db.query(Report).filter(
+            Report.id == uuid.UUID(report_id),
+            Report.tenant_id == uuid.UUID(tenant_id)
+        ).first()
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report {report_id} not found"
+            )
+        
+        # Check if task is still running
+        from services.worker_service.celery_app import celery_app
+        from celery.result import AsyncResult
+        
+        task_id = f"report_{report_id}"
+        task_result = AsyncResult(task_id, app=celery_app)
+        
+        status_info = {
+            'report_id': report_id,
+            'status': report.status,
+            'report_type': report.report_type,
+            'created_at': report.created_at.isoformat() if report.created_at else None,
+            'generated_at': report.generated_at.isoformat() if report.generated_at else None,
+            'celery_task_status': task_result.status if task_result else 'unknown',
+            'task_id': task_id
+        }
+        
+        # Add result if available
+        if report.result_data:
+            status_info['result'] = report.result_data
+        
+        # Add error if failed
+        if report.status == 'failed' and report.result_data and 'error' in report.result_data:
+            status_info['error'] = report.result_data['error']
+        
+        return status_info
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting report status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get report status: {str(e)}"
         )
 
 

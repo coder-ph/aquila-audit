@@ -8,16 +8,113 @@ services:
       - ../shared:/app/shared
 
   worker-service:
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services:/app/services
+
+  ingestion-service:
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/ingestion_service:/app/services/ingestion_service
+
+  llm-service:
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/llm_service:/app/services/llm_service
+
+  reporting-service:
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/reporting_service:/app/services/reporting_service
+
+  # --- NEW SERVICES ---
+
+  reporting-worker:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: aquila_worker
+    container_name: aquila_reporting_worker
+    command: celery -A services.worker_service.celery_app worker --loglevel=info --queues=report_generation --hostname=reporting_worker
     environment:
       - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
       - REDIS_URL=redis://redis:6379/0
       - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
-      - CELERY_BROKER_URL=amqp://aquila:aquila123@rabbitmq:5672
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - LLM_SERVICE_URL=http://llm-service:8004
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      llm-service:
+        condition: service_started
+    networks:
+      - aquila_network
+    restart: unless-stopped
+
+  reporting-consumer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_reporting_consumer
+    command: >
+      python -c "
+      import time;
+      from services.reporting_service.consumers.report_consumer import report_consumer;
+      from shared.messaging.rabbitmq_client import rabbitmq_client;
+      print('Waiting for RabbitMQ...');
+      time.sleep(10);
+      rabbitmq_client.connect();
+      print('Starting consumer...');
+      report_consumer.start_consuming();
+      "
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - ENVIRONMENT=development
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services:/app/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_celery_beat
+    command: celery -A services.worker_service.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
       - ENVIRONMENT=development
     volumes:
       - ../data:/app/data
@@ -32,82 +129,4 @@ services:
         condition: service_healthy
     networks:
       - aquila_network
-    command: celery -A services.worker_service.celery_app worker --loglevel=info
-
-  ingestion-service:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: aquila_ingestion
-    environment:
-      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
-      - REDIS_URL=redis://redis:6379/0
-      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
-      - ENVIRONMENT=development
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../services/ingestion_service:/app/services/ingestion_service
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - aquila_network
-    command: python -m services.ingestion_service.main
-
-  llm-service:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: aquila_llm_service
-    ports:
-      - "8004:8004"
-    environment:
-      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
-      - REDIS_URL=redis://redis:6379/0
-      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-      - ENVIRONMENT=development
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../services/llm_service:/app/services/llm_service
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - aquila_network
-    command: python -m services.llm_service.main
-
-  reporting-service:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: aquila_reporting
-    ports:
-      - "8005:8005"
-    environment:
-      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
-      - REDIS_URL=redis://redis:6379/0
-      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
-    volumes:
-      - ../data:/app/data
-      - ../shared:/app/shared
-      - ../services/reporting_service:/app/services/reporting_service
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - aquila_network
-    command: python -m services.reporting_service.main
+    restart: unless-stopped

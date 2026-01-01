@@ -1,5 +1,4 @@
 
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -109,7 +108,8 @@ services:
     networks:
       - aquila_network
     command: python -m services.reporting_service.main
-  ml-service:  # <--- This was the error. Now correctly indented.
+
+  ml-service:
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -242,6 +242,7 @@ services:
     networks:
       - aquila_network
     command: python -m services.llm_service.main
+
   ingestion-service:
     build:
       context: ..
@@ -272,5 +273,3 @@ volumes:
 networks:
   aquila_network:
     driver: bridge
-
-  
