@@ -8,6 +8,7 @@ python-multipart==0.0.6
 
 # Database & Migration
 sqlalchemy==2.0.23
+sqlalchemy-utils>=0.41.1
 alembic==1.12.1
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
@@ -20,47 +21,58 @@ pyotp==2.9.0
 cryptography>=41.0.0
 pyOpenSSL>=23.2.0
 
-# Rule Engine & Data Processing
-jsonata-python>=0.6.1
-pandas==2.1.3
-numpy==1.26.4
-
-# Task Queue & Cache
+# Task Queue, Messaging & Cache
 celery==5.3.4
 redis==5.0.1
 pika==1.3.2
 kombu==5.3.4
 
-# Machine Learning & LLM
+# Data Processing & ML
+pandas==2.1.3
+numpy==1.26.4
 scikit-learn==1.3.0
 joblib==1.3.0
+jsonata-python>=0.6.1
+
+# LLM Integration
 openai==1.3.0
 tiktoken==0.5.0
 anthropic>=0.7.0
 
-# Reporting - PDF Generation
+# Reporting (PDF, Excel, HTML)
 reportlab==4.4.7
 PyPDF2>=3.0.0
 fpdf2>=2.7.0
 pdfkit>=1.0.0
-
-# Reporting - Excel & HTML
+pdf2image>=1.16.3
 openpyxl==3.1.0
 xlsxwriter>=3.1.0
+xlrd>=2.0.1
 jinja2>=3.1.2
 markdown>=3.4.0
+
+# Compression & Image Processing
+pillow==10.1.0
+zstandard>=0.21.0
+lz4>=4.3.2
+brotli>=1.0.9
 
 # Charts & Visualization
 matplotlib>=3.7.0
 plotly>=5.14.0
 seaborn>=0.12.0
-
-# Utilities
 qrcode==7.4.2
-pillow==10.1.0
+
+# Utilities & File Operations
 python-dotenv==1.0.0
 tenacity==8.2.3
 python-dateutil==2.8.2
 pytz==2023.3
 tzlocal==5.2
 structlog==23.2.0
+watchdog>=3.0.0
+pathvalidate>=2.5.2
+
+# Testing & Monitoring
+pytest>=7.4.0
+pytest-asyncio>=0.21.0

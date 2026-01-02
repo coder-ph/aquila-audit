@@ -26,102 +26,139 @@ class ReportGenerator:
         }
     
     def generate_report(
-    self,
-    report_data: Dict[str, Any],
-    output_format: str = 'pdf',
-    output_dir: Optional[str] = None,
-    tenant_id: Optional[str] = None,
-    include_watermark: bool = True,
-    include_signature: bool = True,
-    include_charts: bool = True,
-    include_interactive: bool = True,
-    include_ai_explanations: bool = True
-) -> Dict[str, Any]:
-    """
-    Generate report in specified format.
-    
-    Args:
-        report_data: Report data
-        output_format: pdf, excel, or html
-        output_dir: Output directory (default: tenant's report directory)
-        tenant_id: Tenant ID for file organization
-        include_watermark: Whether to include watermark (PDF only)
-        include_signature: Whether to include digital signature (PDF only)
-        include_charts: Whether to include charts (Excel/HTML only)
-        include_interactive: Whether to include interactive features (HTML only)
-        include_ai_explanations: Whether to include AI explanations
-    
-    Returns:
-        Generation metadata
-    """
-    if output_format not in self.generators:
-        raise ValueError(f"Unsupported format: {output_format}. Supported: {list(self.generators.keys())}")
-    
-    # Enhance report data with AI if requested
-    if include_ai_explanations:
-        try:
-            from services.reporting_service.integrations.llm_integration import llm_integration
-            report_data = llm_integration.enhance_report_with_ai(report_data)
-        except Exception as e:
-            logger.error(f"Failed to enhance report with AI: {str(e)}")
-            # Continue without AI enhancements
-    
-    # Determine output directory
-    if output_dir is None:
-        if tenant_id:
-            output_dir = Path(config.reports_dir) / str(tenant_id)
+        self,
+        report_data: Dict[str, Any],
+        output_format: str = 'pdf',
+        output_dir: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        include_watermark: bool = True,
+        include_signature: bool = True,
+        include_charts: bool = True,
+        include_interactive: bool = True,
+        include_ai_explanations: bool = True,
+        track_metadata: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate report in specified format.
+        
+        Args:
+            report_data: Report data
+            output_format: pdf, excel, or html
+            output_dir: Output directory (default: tenant's report directory)
+            tenant_id: Tenant ID for file organization
+            include_watermark: Whether to include watermark (PDF only)
+            include_signature: Whether to include digital signature (PDF only)
+            include_charts: Whether to include charts (Excel/HTML only)
+            include_interactive: Whether to include interactive features (HTML only)
+            include_ai_explanations: Whether to include AI explanations
+            track_metadata: Whether to track metadata in database
+        
+        Returns:
+            Generation metadata
+        """
+        if output_format not in self.generators:
+            raise ValueError(f"Unsupported format: {output_format}. Supported: {list(self.generators.keys())}")
+        
+        # Enhance report data with AI if requested
+        if include_ai_explanations:
+            try:
+                from services.reporting_service.integrations.llm_integration import llm_integration
+                report_data = llm_integration.enhance_report_with_ai(report_data)
+            except Exception as e:
+                logger.error(f"Failed to enhance report with AI: {str(e)}")
+                # Continue without AI enhancements
+        
+        # Determine output directory
+        if output_dir is None:
+            if tenant_id:
+                output_dir = Path(config.reports_dir) / str(tenant_id)
+            else:
+                output_dir = Path(config.reports_dir) / 'default'
         else:
-            output_dir = Path(config.reports_dir) / 'default'
-    else:
-        output_dir = Path(output_dir)
-    
-    # Create output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate unique filename
-    report_id = report_data.get('report_id', f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"{report_id}_{timestamp}.{output_format}"
-    output_path = output_dir / filename
-    
-    # Select generator based on format
-    generator = self.generators[output_format]
-    
-    # Generate report with format-specific options
-    if output_format == 'pdf':
-        metadata = generator.generate_report(
-            report_data=report_data,
-            output_path=str(output_path),
-            include_watermark=include_watermark,
-            include_signature=include_signature,
-            include_ai_explanations=include_ai_explanations
-        )
-    elif output_format == 'excel':
-        metadata = generator.generate_report(
-            report_data=report_data,
-            output_path=str(output_path),
-            include_charts=include_charts,
-            include_ai_explanations=include_ai_explanations
-        )
-    elif output_format == 'html':
-        metadata = generator.generate_report(
-            report_data=report_data,
-            output_path=str(output_path),
-            include_interactive=include_interactive,
-            include_ai_explanations=include_ai_explanations
-        )
-    
-    # Add additional metadata
-    metadata.update({
-        'report_id': report_id,
-        'tenant_id': tenant_id,
-        'format': output_format,
-        'filename': filename,
-        'relative_path': str(output_path.relative_to(Path.cwd())) if output_path.is_relative_to(Path.cwd()) else str(output_path),
-        'ai_enhanced': include_ai_explanations
-    })
-    
-    return metadata
+            output_dir = Path(output_dir)
+        
+        # Create output directory
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        report_id = report_data.get('report_id', f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{report_id}_{timestamp}.{output_format}"
+        output_path = output_dir / filename
+        
+        # Select generator based on format
+        generator = self.generators[output_format]
+        
+        # Generate report with format-specific options
+        if output_format == 'pdf':
+            metadata = generator.generate_report(
+                report_data=report_data,
+                output_path=str(output_path),
+                include_watermark=include_watermark,
+                include_signature=include_signature,
+                include_ai_explanations=include_ai_explanations
+            )
+        elif output_format == 'excel':
+            metadata = generator.generate_report(
+                report_data=report_data,
+                output_path=str(output_path),
+                include_charts=include_charts,
+                include_ai_explanations=include_ai_explanations
+            )
+        elif output_format == 'html':
+            metadata = generator.generate_report(
+                report_data=report_data,
+                output_path=str(output_path),
+                include_interactive=include_interactive,
+                include_ai_explanations=include_ai_explanations
+            )
+        
+        # Add additional metadata
+        metadata.update({
+            'report_id': report_id,
+            'tenant_id': tenant_id,
+            'format': output_format,
+            'filename': filename,
+            'relative_path': str(output_path.relative_to(Path.cwd())) if output_path.is_relative_to(Path.cwd()) else str(output_path),
+            'ai_enhanced': include_ai_explanations
+        })
+        
+        # Track metadata in database if requested
+        if track_metadata and tenant_id:
+            try:
+                from services.reporting_service.storage.report_metadata import report_metadata_manager
+                import uuid
+                
+                report_uuid = uuid.UUID(report_id) if len(report_id) == 36 else uuid.uuid4()
+                tenant_uuid = uuid.UUID(tenant_id) if tenant_id else uuid.uuid4()
+                
+                # In practice, user_id would come from authentication context
+                # For now, use a system user
+                user_uuid = uuid.uuid4()
+                
+                # Add file size if not already in metadata
+                if 'file_size' not in metadata and output_path.exists():
+                    metadata['file_size'] = output_path.stat().st_size
+                
+                # Store metadata in database
+                report_metadata_manager.create_report_metadata(
+                    report_id=report_uuid,
+                    tenant_id=tenant_uuid,
+                    user_id=user_uuid,
+                    report_type=output_format,
+                    file_path=str(output_path),
+                    report_data=report_data,
+                    file_size=metadata.get('file_size', 0)
+                )
+                
+                metadata['metadata_tracked'] = True
+                
+            except Exception as e:
+                logger.error(f"Failed to track report metadata: {str(e)}")
+                metadata['metadata_tracked'] = False
+                metadata['metadata_error'] = str(e)
+        
+        return metadata
     
     def generate_multiple_formats(
         self,

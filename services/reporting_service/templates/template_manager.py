@@ -1,201 +1,235 @@
 """
 Template manager for report generation.
 """
+import os
 import json
-from typing import Dict, List, Any, Optional
 from pathlib import Path
-from datetime import datetime
+from typing import Dict, Any, List, Optional
 
 from shared.utils.logging import logger
 from services.reporting_service.config import config
 
 
 class TemplateManager:
-    """Manages report templates and styling."""
+    """Manages report templates."""
     
     def __init__(self):
         self.templates_dir = Path(config.templates_dir)
-        self.templates_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Load template configurations
-        self.templates = self._load_templates()
-    
-    def _load_templates(self) -> Dict[str, Any]:
-        """Load available templates."""
-        templates = {}
-        
-        # Check for template definitions
-        templates_file = self.templates_dir / "templates.json"
-        if templates_file.exists():
-            try:
-                with open(templates_file, 'r') as f:
-                    templates = json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading templates: {str(e)}")
-        
-        # Ensure default template exists
-        if 'default' not in templates:
-            templates['default'] = {
-                'name': 'Default Template',
-                'description': 'Standard audit report template',
-                'styles': {
-                    'primary_color': '#2C3E50',
-                    'secondary_color': '#3498DB',
-                    'accent_color': '#E74C3C',
-                    'font_family': 'Inter, sans-serif',
-                    'header_background': 'linear-gradient(135deg, #2C3E50, #3498DB)'
-                },
-                'sections': [
-                    'cover',
-                    'toc',
-                    'executive_summary',
-                    'findings',
-                    'recommendations',
-                    'appendix'
-                ]
-            }
-        
-        return templates
+        self.ensure_default_templates()
     
     def ensure_default_templates(self):
-        """Ensure all default templates and assets exist."""
-        # Create templates directory if it doesn't exist
+        """Ensure all default templates exist."""
         self.templates_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create assets directory
-        assets_dir = Path(config.assets_dir)
-        assets_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure base template exists
+        base_template = self.templates_dir / "base_template.html"
+        if not base_template.exists():
+            self._create_default_base_template()
         
-        # Save template definitions
-        templates_file = self.templates_dir / "templates.json"
-        with open(templates_file, 'w') as f:
-            json.dump(self.templates, f, indent=2)
+        # Ensure audit report template exists
+        audit_template = self.templates_dir / "audit_report.html"
+        if not audit_template.exists():
+            # Check if old filename exists and rename it
+            old_template = self.templates_dir / "audit-report.html"
+            if old_template.exists():
+                old_template.rename(audit_template)
+                logger.info(f"Renamed template: audit-report.html -> audit_report.html")
+            else:
+                self._create_default_audit_template()
         
-        # Create sample logo if it doesn't exist
-        logo_path = Path(config.company_logo_path)
-        if not logo_path.exists():
-            self._create_sample_logo(logo_path)
+        # Ensure CSS exists
+        css_file = self.templates_dir / "style.css"
+        if not css_file.exists():
+            self._create_default_css()
         
-        logger.info("Default templates ensured")
+        # Ensure watermark image exists
+        watermark_dir = self.templates_dir / "watermarks"
+        watermark_dir.mkdir(exist_ok=True)
+        watermark_file = watermark_dir / "confidential.png"
+        if not watermark_file.exists():
+            self._create_default_watermark()
     
-    def _create_sample_logo(self, logo_path: Path):
-        """Create a sample logo for testing."""
+    def _create_default_base_template(self):
+        """Create default base template."""
+        # This is already in html_generator.py
+        # We'll use a simplified version
+        from services.reporting_service.generators.html_generator import HTMLGenerator
+        html_gen = HTMLGenerator()
+        # Base template is created in HTMLGenerator.__init__
+    
+    def _create_default_audit_template(self):
+        """Create default audit template."""
+        # This is already in html_generator.py
+        from services.reporting_service.generators.html_generator import HTMLGenerator
+        html_gen = HTMLGenerator()
+        # Audit template is created in HTMLGenerator._create_default_audit_template()
+    
+    def _create_default_css(self):
+        """Create default CSS."""
+        # This is already in html_generator.py
+        from services.reporting_service.generators.html_generator import HTMLGenerator
+        html_gen = HTMLGenerator()
+        # CSS is created in HTMLGenerator._create_default_css()
+    
+    def _create_default_watermark(self):
+        """Create default watermark image."""
         try:
-            from reportlab.lib import colors
-            from reportlab.lib.units import inch
-            from reportlab.pdfgen import canvas
-            from reportlab.pdfbase import pdfmetrics
-            from reportlab.pdfbase.ttfonts import TTFont
-            import tempfile
+            from PIL import Image, ImageDraw, ImageFont
+            import io
             
-            # Create a simple PDF logo
-            c = canvas.Canvas(str(logo_path), pagesize=(2*inch, 1*inch))
+            # Create a simple watermark image
+            width, height = 400, 200
+            image = Image.new('RGBA', (width, height), (255, 255, 255, 0))
+            draw = ImageDraw.Draw(image)
             
-            # Draw logo background
-            c.setFillColor(colors.HexColor('#2C3E50'))
-            c.rect(0.1*inch, 0.1*inch, 1.8*inch, 0.8*inch, fill=1, stroke=0)
+            # Try to use a font
+            try:
+                font = ImageFont.truetype("arial.ttf", 24)
+            except:
+                font = ImageFont.load_default()
             
-            # Draw logo text
-            c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 14)
-            c.drawString(0.3*inch, 0.4*inch, "AQUILA")
-            c.setFont("Helvetica", 10)
-            c.drawString(0.3*inch, 0.2*inch, "AUDIT")
+            # Draw watermark text
+            text = "CONFIDENTIAL"
+            text_width, text_height = draw.textsize(text, font=font)
             
-            c.save()
+            # Position text at an angle
+            draw.text(
+                ((width - text_width) / 2, (height - text_height) / 2),
+                text,
+                fill=(255, 0, 0, 128),  # Red with transparency
+                font=font
+            )
             
+            # Save the image
+            watermark_path = self.templates_dir / "watermarks" / "confidential.png"
+            image.save(str(watermark_path), 'PNG')
+            
+            logger.info(f"Created default watermark: {watermark_path}")
+        
+        except ImportError:
+            logger.warning("PIL not installed, skipping watermark image creation")
         except Exception as e:
-            logger.error(f"Error creating sample logo: {str(e)}")
-    
-    def get_template(self, template_name: str = 'default') -> Optional[Dict[str, Any]]:
-        """Get a specific template configuration."""
-        return self.templates.get(template_name)
+            logger.error(f"Failed to create watermark image: {str(e)}")
     
     def list_templates(self) -> List[Dict[str, Any]]:
         """List all available templates."""
-        return [
-            {
-                'name': name,
-                'display_name': template.get('name', name),
-                'description': template.get('description', ''),
-                'sections': template.get('sections', [])
+        templates = []
+        
+        for template_file in self.templates_dir.glob("*.html"):
+            template_info = {
+                'name': template_file.stem,
+                'filename': template_file.name,
+                'path': str(template_file),
+                'size': template_file.stat().st_size,
+                'modified': template_file.stat().st_mtime
             }
-            for name, template in self.templates.items()
-        ]
+            templates.append(template_info)
+        
+        return templates
+    
+    def get_template(self, template_name: str) -> Optional[str]:
+        """Get template content."""
+        template_path = self.templates_dir / f"{template_name}.html"
+        
+        if template_path.exists():
+            return template_path.read_text(encoding='utf-8')
+        
+        return None
     
     def create_template(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new template."""
-        template_name = template_data.get('name')
-        if not template_name:
-            raise ValueError("Template name is required")
+        """
+        Create a new template.
         
-        # Ensure template name is valid
-        template_name = template_name.lower().replace(' ', '_')
+        Args:
+            template_data: Template data with 'name' and 'content'
         
-        if template_name in self.templates:
-            raise ValueError(f"Template '{template_name}' already exists")
+        Returns:
+            Creation result
+        """
+        try:
+            template_name = template_data.get('name')
+            template_content = template_data.get('content')
+            
+            if not template_name or not template_content:
+                raise ValueError("Template name and content are required")
+            
+            # Validate template name
+            if not template_name.replace('_', '').isalnum():
+                raise ValueError("Template name can only contain letters, numbers, and underscores")
+            
+            template_path = self.templates_dir / f"{template_name}.html"
+            
+            if template_path.exists():
+                raise ValueError(f"Template '{template_name}' already exists")
+            
+            # Save template
+            template_path.write_text(template_content, encoding='utf-8')
+            
+            logger.info(f"Created new template: {template_name}")
+            
+            return {
+                'success': True,
+                'template_name': template_name,
+                'path': str(template_path),
+                'size': len(template_content)
+            }
         
-        # Add template
-        self.templates[template_name] = template_data
-        
-        # Save templates
-        templates_file = self.templates_dir / "templates.json"
-        with open(templates_file, 'w') as f:
-            json.dump(self.templates, f, indent=2)
-        
-        logger.info(f"Template created: {template_name}")
-        
-        return {
-            'success': True,
-            'template_name': template_name,
-            'message': f"Template '{template_name}' created successfully"
-        }
+        except Exception as e:
+            logger.error(f"Failed to create template: {str(e)}")
+            raise
     
-    def update_template(self, template_name: str, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_template(self, template_name: str, template_content: str) -> Dict[str, Any]:
         """Update an existing template."""
-        if template_name not in self.templates:
-            raise ValueError(f"Template '{template_name}' not found")
+        try:
+            template_path = self.templates_dir / f"{template_name}.html"
+            
+            if not template_path.exists():
+                raise ValueError(f"Template '{template_name}' does not exist")
+            
+            # Backup old template
+            backup_path = template_path.with_suffix('.html.bak')
+            if template_path.exists():
+                template_path.rename(backup_path)
+            
+            # Save new template
+            template_path.write_text(template_content, encoding='utf-8')
+            
+            logger.info(f"Updated template: {template_name}")
+            
+            return {
+                'success': True,
+                'template_name': template_name,
+                'backup_created': backup_path.exists()
+            }
         
-        # Update template
-        self.templates[template_name].update(template_data)
-        
-        # Save templates
-        templates_file = self.templates_dir / "templates.json"
-        with open(templates_file, 'w') as f:
-            json.dump(self.templates, f, indent=2)
-        
-        logger.info(f"Template updated: {template_name}")
-        
-        return {
-            'success': True,
-            'template_name': template_name,
-            'message': f"Template '{template_name}' updated successfully"
-        }
+        except Exception as e:
+            logger.error(f"Failed to update template: {str(e)}")
+            raise
     
     def delete_template(self, template_name: str) -> Dict[str, Any]:
         """Delete a template."""
-        if template_name not in self.templates:
-            raise ValueError(f"Template '{template_name}' not found")
+        try:
+            template_path = self.templates_dir / f"{template_name}.html"
+            
+            if not template_path.exists():
+                raise ValueError(f"Template '{template_name}' does not exist")
+            
+            # Backup before deletion
+            backup_path = template_path.with_suffix('.html.bak')
+            if template_path.exists():
+                template_path.rename(backup_path)
+            
+            logger.info(f"Deleted template: {template_name}")
+            
+            return {
+                'success': True,
+                'template_name': template_name,
+                'backup_path': str(backup_path)
+            }
         
-        # Don't allow deletion of default template
-        if template_name == 'default':
-            raise ValueError("Cannot delete default template")
-        
-        # Remove template
-        del self.templates[template_name]
-        
-        # Save templates
-        templates_file = self.templates_dir / "templates.json"
-        with open(templates_file, 'w') as f:
-            json.dump(self.templates, f, indent=2)
-        
-        logger.info(f"Template deleted: {template_name}")
-        
-        return {
-            'success': True,
-            'template_name': template_name,
-            'message': f"Template '{template_name}' deleted successfully"
-        }
+        except Exception as e:
+            logger.error(f"Failed to delete template: {str(e)}")
+            raise
 
 
 # Global template manager instance

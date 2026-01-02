@@ -16,6 +16,7 @@ from shared.database.base import init_db
 from shared.messaging.rabbitmq_client import rabbitmq_client
 from services.reporting_service.config import config
 from services.reporting_service.routes import reports_routes
+from services.reporting_service.routes import storage_routes
 
 
 asynccontextmanager
@@ -42,6 +43,8 @@ app.add_middleware(
 
 # Include routes
 app.include_router(reports_routes.router)
+app.include_router(reports_routes.router)
+app.include_router(storage_routes.router)
 
 # Health check endpoint
 @app.get(config.health_check_path, tags=["Health"])
