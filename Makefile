@@ -66,3 +66,45 @@ down:
 logs:
 	@echo "Showing service logs..."
 	docker-compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml logs -f
+
+# Week 11 Targets
+setup-week11:
+	@echo "Setting up Week 11 features..."
+	@chmod +x scripts/setup_week11.sh
+	@./scripts/setup_week11.sh
+
+setup-dashboard:
+	@echo "Setting up dashboard..."
+	@python scripts/setup_dashboard.py
+
+test-dashboard:
+	@echo "Testing dashboard features..."
+	@python scripts/test_dashboard.py
+
+test-week11:
+	@echo "Running Week 11 integration tests..."
+	@python scripts/test_week11_integration.py
+
+start-week11:
+	@echo "Starting Week 11 services..."
+	@docker-compose up -d admin-service billing-service
+	@echo "Services started. Dashboard available at: http://localhost:8001/admin/dashboard"
+
+stop-week11:
+	@echo "Stopping Week 11 services..."
+	@docker-compose stop admin-service billing-service
+
+logs-week11:
+	@echo "Showing Week 11 service logs..."
+	@docker-compose logs -f admin-service billing-service
+
+# Combined targets
+week11-all: setup-week11 setup-dashboard start-week11
+	@echo "Week 11 setup complete!"
+
+week11-test: test-dashboard test-week11
+	@echo "Week 11 tests complete!"
+
+# Update existing test target
+test: test-dashboard test-week11
+	@echo "All tests completed!"

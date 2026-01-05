@@ -7,6 +7,14 @@ services:
       - ../services:/app/services
       - ../shared:/app/shared
 
+  billing-service:
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../data:/app/data
+      - ../shared:/app/shared
+      - ../services/billing_service:/app/services/billing_service
   worker-service:
     environment:
       - ENVIRONMENT=development

@@ -85,6 +85,33 @@ services:
       - aquila_network
     command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
 
+  billing-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: aquila_billing_service
+    ports:
+      - "8006:8006"
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://aquila:aquila123@postgres:5432/aquila_audit
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://aquila:aquila123@rabbitmq:5672
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - aquila_network
+    command: uvicorn services.billing_service.main:app --host 0.0.0.0 --port 8006
   reporting-service:
     build:
       context: ..

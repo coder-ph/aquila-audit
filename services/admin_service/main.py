@@ -9,6 +9,7 @@ from shared.messaging.rabbitmq_client import rabbitmq_client
 
 from services.admin_service.managers import tenant_manager, user_manager, role_manager
 from services.admin_service.config import config
+from services.admin_service.routes.dashboard_routes import router as dashboard_router
 
 
 @asynccontextmanager
@@ -116,6 +117,12 @@ app.include_router(
     role_manager.router,
     prefix=f"{config.api_prefix}/roles",
     tags=["Roles"]
+)
+
+app.include_router(
+    dashboard_router,
+    prefix=f"{config.api_prefix}/dashboard",
+    tags=["Dashboard"]
 )
 
 
